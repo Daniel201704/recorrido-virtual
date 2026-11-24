@@ -7,7 +7,7 @@ const PUNTOS = [
     "lat": 19.585633,
     "lng": -99.284072,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Control Escolar, Extensión y Vinculación, Servicio Social, Titulación y laboratorios de cómputo.",
     "caminos": [
       {
         "a": "a_casco",
@@ -95,7 +95,7 @@ const PUNTOS = [
     "lat": 19.585779,
     "lng": -99.283249,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Papelería.",
     "caminos": [
       {
         "a": "b_c",
@@ -133,7 +133,7 @@ const PUNTOS = [
     "lat": 19.585483,
     "lng": -99.283056,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Difusión Cultural.",
     "caminos": [
       {
         "a": "c_d",
@@ -175,7 +175,7 @@ const PUNTOS = [
     "lat": 19.585243,
     "lng": -99.28297,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Laboratorio Digital de Idiomas y Aula Digital.",
     "caminos": [
       {
         "a": "edificio_e",
@@ -198,7 +198,7 @@ const PUNTOS = [
     "lat": 19.585114,
     "lng": -99.283136,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Laboratorio de Arquitectura de Computadoras y Sala de Audiencias.",
     "caminos": [
       {
         "a": "edificio_d",
@@ -255,7 +255,7 @@ const PUNTOS = [
     "lat": 19.585039,
     "lng": -99.282541,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Laboratorio de Inteligencia Artificial (IA).",
     "caminos": [
       {
         "a": "incubadora_de_empresas",
@@ -408,7 +408,7 @@ const PUNTOS = [
     "lat": 19.584422,
     "lng": -99.284635,
     "angulo": 180,
-    "descripcion": "",
+    "descripcion": "Sala Azul.",
     "caminos": [
       {
         "a": "camino_a_biblioteca",
