@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<link rel="icon" href="iconos/icono-192.png">
+<link rel="apple-touch-icon" href="iconos/icono-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Recorrido CU">
+<title>Recorrido virtual · Centro Universitario UAEM Valle de México</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="datos.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Segoe UI", Roboto, Arial, sans-serif; background: #111; }
+  #pano { position: absolute; inset: 0; }
+
+  /* Barra de búsqueda (arriba a la izquierda, como Google Maps) */
+  #panel { position: absolute; top: 12px; left: 12px; width: min(360px, calc(100% - 24px)); z-index: 1000; }
+  #buscador { background: #fff; border-radius: 24px; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: flex; align-items: center; padding: 0 16px; height: 48px; }
+  #buscador svg { flex: none; }
+  #q { border: 0; outline: 0; font-size: 15px; flex: 1; margin-left: 10px; background: transparent; }
+  #resultados { background: #fff; border-radius: 12px; margin-top: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.35); max-height: 50vh; overflow-y: auto; display: none; }
+  .res { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+  .res:last-child { border-bottom: 0; }
+  .res:hover, .res.activo { background: #f1f3f4; }
+  .res small { display: block; color: #5f6368; margin-top: 2px; }
+  .vacio { padding: 12px 16px; color: #5f6368; font-size: 14px; }
+
+  /* Tarjeta del lugar actual */
+  #tarjeta { background: rgba(32,33,36,.88); color: #fff; border-radius: 12px; margin-top: 8px; padding: 12px 16px; font-size: 14px; line-height: 1.4; }
+  #tarjeta h1 { font-size: 17px; margin: 0 0 4px; font-weight: 600; }
+  #tarjeta p { margin: 0; color: #dadce0; }
+  #tarjeta .prof { margin-top: 8px; color: #fff; background: #1a73e8; border-radius: 8px; padding: 6px 10px; display: none; }
+
+  /* Mini mapa (abajo a la izquierda, como Street View) */
+  #mapa { position: absolute; left: 12px; bottom: 12px; width: 260px; height: 180px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.5); z-index: 1000; border: 2px solid #fff; transition: width .2s, height .2s; }
+  #mapa.grande { width: min(520px, calc(100% - 24px)); height: min(380px, 55vh); }
+  #ampliar { position: absolute; left: 18px; bottom: 18px; z-index: 1001; background: #fff; border: 0; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+
+  /* Flechas para caminar */
+  .flecha { width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(255,255,255,.92); box-shadow: 0 2px 8px rgba(0,0,0,.55); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
+  .flecha:hover { transform: scale(1.12); background: #fff; }
+  .flecha svg { width: 30px; height: 30px; }
+  .flecha .etq { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(32,33,36,.88); color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 13px; pointer-events: none; }
+
+  /* Marcadores del mapa */
+  .pt { width: 14px; height: 14px; border-radius: 50%; background: #1a73e8; border: 2px solid #fff; box-shadow: 0 0 3px rgba(0,0,0,.6); }
+  .pt.actual { background: #ea4335; width: 18px; height: 18px; }
+
+  /* Modo edición */
+  #editor { position: absolute; right: 12px; bottom: 12px; z-index: 1000; background: #fffbe6; border: 2px solid #f9ab00; border-radius: 10px; padding: 10px 14px; font: 13px/1.5 Consolas, monospace; max-width: 320px; display: none; }
+  #aviso { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 24px; z-index: 900; }
+
+  /* Controles de Pannellum a la derecha y sin su título (ya está en la tarjeta) */
+  .pnlm-controls-container { left: auto !important; right: 12px; top: 12px !important; }
+  .pnlm-panorama-info { display: none !important; }
+
+  /* Botón instalar app */
+  #instalar { position: absolute; right: 12px; bottom: 12px; z-index: 1000; background: #1a73e8; color: #fff; border: 0; border-radius: 24px; padding: 12px 18px; font: 600 14px "Segoe UI", Roboto, Arial, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.45); cursor: pointer; display: none; }
+  #ios { position: absolute; right: 12px; bottom: 12px; z-index: 1000; background: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; max-width: 260px; box-shadow: 0 2px 8px rgba(0,0,0,.45); display: none; }
+
+  @media (max-width: 600px) {
+    #mapa { width: 150px; height: 120px; }
+    #panel { width: calc(100% - 70px); }
+    #tarjeta { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div id="pano"></div>
+<div id="aviso"></div>
+
+<div id="panel">
+  <div id="buscador">
+    <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#5f6368" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <input id="q" type="search" placeholder="Buscar profesor, edificio o área" autocomplete="off">
+  </div>
+  <div id="resultados"></div>
+  <div id="tarjeta">
+    <h1 id="t-nombre"></h1>
+    <p id="t-desc"></p>
+    <div class="prof" id="t-prof"></div>
+  </div>
+</div>
+
+<div id="mapa"></div>
+<button id="ampliar" title="Ampliar o reducir el mapa">⤢</button>
+<button id="instalar">📲 Instalar app</button>
+<div id="ios">📲 Para instalar: toca <b>Compartir</b> y luego <b>“Agregar a pantalla de inicio”</b>. <a href="#" id="ios-x">Cerrar</a></div>
+<div id="editor"><b>Modo edición</b><br>
+  Clic en la foto → <span id="e-foto">yaw de la flecha</span><br>
+  Clic en el mapa → <span id="e-mapa">lat, lng del punto</span>
+</div>
+
+<script>
+const EDITAR = new URLSearchParams(location.search).has('editar');
+const porId = Object.fromEntries(PUNTOS.map(p => [p.id, p]));
+const quitarAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const ICONO_FLECHA = '<svg viewBox="0 0 24 24"><path fill="#1a73e8" d="M12 4l-8 8h5v8h6v-8h5z"/></svg>';
+
+let viewer = null, actual = null;
+const medidas = {};   // relación de aspecto de cada foto
+
+// ---------- Panorámicas ----------
+function medir(p) {
+  if (medidas[p.id]) return Promise.resolve(medidas[p.id]);
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => ok(medidas[p.id] = img.naturalHeight / img.naturalWidth);
+    img.onerror = () => mal(new Error('No se encontró la foto: ' + p.foto));
+    img.src = encodeURI(p.foto);
+  });
+}
+
+// Campo de visión horizontal máximo para que nunca se vea el fondo negro
+function hfovQueCabe(vaov) {
+  const a = window.innerWidth / window.innerHeight;
+  return 2 * Math.atan(Math.tan(vaov * Math.PI / 360) * a) * 180 / Math.PI * 0.98;
+}
+window.addEventListener('resize', () => {
+  if (!viewer || !actual || !medidas[actual]) return;
+  const c = configEscena(porId[actual], medidas[actual]);
+  viewer.setHfovBounds([c.minHfov, c.maxHfov]);
+  if (viewer.getHfov() > c.maxHfov) viewer.setHfov(c.maxHfov, false);
+});
+
+function crearFlecha(div, texto) {
+  div.innerHTML = ICONO_FLECHA + '<span class="etq">' + texto + '</span>';
+}
+
+function configEscena(p, aspecto) {
+  const haov = Math.min(p.angulo || 180, 360);
+  const vaov = Math.min(haov * aspecto, 180);
+  const pitchFlecha = -Math.min(vaov / 2 * 0.55, 25);
+  const maxH = Math.min(haov, hfovQueCabe(vaov));
+  return {
+    title: p.nombre,
+    type: 'equirectangular',
+    panorama: encodeURI(p.foto),
+    haov, vaov, vOffset: 0,
+    hfov: Math.min(90, maxH), minHfov: Math.min(30, maxH), maxHfov: maxH,
+    minPitch: -vaov / 2, maxPitch: vaov / 2,
+    avoidShowingBackground: true,
+    hotSpots: (p.caminos || []).filter(c => porId[c.a]).map(c => ({
+      pitch: c.pitch ?? pitchFlecha,
+      yaw: c.yaw,
+      cssClass: 'flecha',
+      createTooltipFunc: crearFlecha,
+      createTooltipArgs: porId[c.a].nombre,
+      clickHandlerFunc: (e, id) => irA(id),
+      clickHandlerArgs: c.a
+    }))
+  };
+}
+
+async function irA(id, profesor) {
+  const p = porId[id];
+  if (!p) return;
+  try {
+    const aspecto = await medir(p);
+    const cfg = configEscena(p, aspecto);
+    if (!viewer) {
+      viewer = pannellum.viewer('pano', {
+        default: { firstScene: id, sceneFadeDuration: 700, autoLoad: true, compass: false, showControls: true },
+        scenes: { [id]: cfg },
+        hotSpotDebug: EDITAR
+      });
+      viewer.on('mousedown', e => {
+        if (!EDITAR) return;
+        const [pitch, yaw] = viewer.mouseEventToCoords(e);
+        document.getElementById('e-foto').textContent = 'yaw: ' + yaw.toFixed(0) + '  (pitch: ' + pitch.toFixed(0) + ')';
+      });
+    } else if (actual !== id) {
+      if (!viewer.getConfig().scenes || !(id in (viewer.getConfig().scenes || {}))) {
+        try { viewer.addScene(id, cfg); } catch (e) {}
+      }
+      viewer.loadScene(id, 0, 0, cfg.hfov);
+    }
+    actual = id;
+    document.getElementById('aviso').style.display = 'none';
+    mostrarTarjeta(p, profesor);
+    pintarMapa();
+  } catch (err) {
+    const a = document.getElementById('aviso');
+    a.innerHTML = '<div><h2>Falta la foto de “' + p.nombre + '”</h2><p>' + err.message + '</p></div>';
+    a.style.display = 'flex';
+    actual = id;
+    mostrarTarjeta(p, profesor);
+    pintarMapa();
+  }
+}
+
+function mostrarTarjeta(p, profesor) {
+  document.getElementById('t-nombre').textContent = p.nombre;
+  document.getElementById('t-desc').textContent = p.descripcion || '';
+  const tp = document.getElementById('t-prof');
+  if (profesor) {
+    tp.textContent = profesor.nombre + ' — ' + profesor.lugar;
+    tp.style.display = 'block';
+  } else tp.style.display = 'none';
+}
+
+// ---------- Mini mapa ----------
+const mapa = L.map('mapa', { zoomControl: false, attributionControl: true });
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 20, maxNativeZoom: 19, attribution: 'Imágenes © Esri'
+}).addTo(mapa);
+L.control.zoom({ position: 'topright' }).addTo(mapa);
+
+const lineas = [];
+PUNTOS.forEach(p => (p.caminos || []).forEach(c => {
+  const d = porId[c.a];
+  if (d && p.lat != null && d.lat != null && p.id < d.id) lineas.push(L.polyline([[p.lat, p.lng], [d.lat, d.lng]], { color: '#4fc3f7', weight: 4, opacity: .9 }).addTo(mapa));
+}));
+const marcadores = {};
+PUNTOS.forEach(p => {
+  if (p.lat == null || p.lng == null) return;
+  marcadores[p.id] = L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<div class="pt"></div>', iconSize: [14, 14] }) })
+    .addTo(mapa).bindTooltip(p.nombre, { direction: 'top' })
+    .on('click', () => irA(p.id));
+});
+const conUbicacion = PUNTOS.filter(p => p.lat != null && p.lng != null);
+if (conUbicacion.length) mapa.fitBounds(L.latLngBounds(conUbicacion.map(p => [p.lat, p.lng])).pad(0.3), { maxZoom: 19 });
+else mapa.setView([19.5834101, -99.2839584], 18);
+
+function pintarMapa() {
+  PUNTOS.forEach(p => {
+    if (!marcadores[p.id]) return;
+    const actualP = p.id === actual;
+    marcadores[p.id].setIcon(L.divIcon({ className: '', html: '<div class="pt' + (actualP ? ' actual' : '') + '"></div>', iconSize: actualP ? [18, 18] : [14, 14] }));
+    marcadores[p.id].setZIndexOffset(actualP ? 1000 : 0);
+  });
+  const p = porId[actual];
+  if (p && p.lat != null) mapa.panTo([p.lat, p.lng]);
+}
+
+document.getElementById('ampliar').onclick = () => {
+  document.getElementById('mapa').classList.toggle('grande');
+  setTimeout(() => mapa.invalidateSize(), 250);
+};
+
+if (EDITAR) {
+  document.getElementById('editor').style.display = 'block';
+  mapa.on('click', e => {
+    document.getElementById('e-mapa').textContent = 'lat: ' + e.latlng.lat.toFixed(6) + ', lng: ' + e.latlng.lng.toFixed(6);
+  });
+}
+
+// ---------- Buscador ----------
+const q = document.getElementById('q'), res = document.getElementById('resultados');
+let opciones = [], sel = -1;
+
+function buscar() {
+  const t = quitarAcentos(q.value.trim());
+  if (!t) { res.style.display = 'none'; return; }
+  opciones = [
+    ...PROFESORES.filter(x => quitarAcentos(x.nombre).includes(t) && porId[x.punto])
+      .map(x => ({ titulo: x.nombre, sub: x.lugar + ' · ' + porId[x.punto].nombre, id: x.punto, prof: x })),
+    ...PUNTOS.filter(x => quitarAcentos(x.nombre + ' ' + (x.descripcion || '')).includes(t))
+      .map(x => ({ titulo: x.nombre, sub: 'Lugar', id: x.id }))
+  ].slice(0, 12);
+  sel = -1;
+  res.innerHTML = opciones.length
+    ? opciones.map((o, i) => '<div class="res" data-i="' + i + '">' + o.titulo + '<small>' + o.sub + '</small></div>').join('')
+    : '<div class="vacio">Sin resultados</div>';
+  res.style.display = 'block';
+}
+function elegir(i) {
+  const o = opciones[i];
+  if (!o) return;
+  res.style.display = 'none';
+  q.value = o.titulo;
+  q.blur();
+  irA(o.id, o.prof);
+}
+q.addEventListener('input', buscar);
+q.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    sel = Math.max(0, Math.min(opciones.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1)));
+    [...res.children].forEach((c, i) => c.classList.toggle('activo', i === sel));
+    e.preventDefault();
+  } else if (e.key === 'Enter') elegir(sel >= 0 ? sel : 0);
+  else if (e.key === 'Escape') res.style.display = 'none';
+});
+res.addEventListener('click', e => { const d = e.target.closest('.res'); if (d) elegir(+d.dataset.i); });
+document.addEventListener('click', e => { if (!document.getElementById('panel').contains(e.target)) res.style.display = 'none'; });
+
+// ---------- App instalable ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+const enApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+let avisoInstalar = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); avisoInstalar = e;
+  if (!enApp) document.getElementById('instalar').style.display = 'block';
+});
+document.getElementById('instalar').onclick = async () => {
+  if (!avisoInstalar) return;
+  avisoInstalar.prompt(); await avisoInstalar.userChoice;
+  avisoInstalar = null; document.getElementById('instalar').style.display = 'none';
+};
+window.addEventListener('appinstalled', () => { document.getElementById('instalar').style.display = 'none'; });
+if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !enApp) {
+  document.getElementById('ios').style.display = 'block';
+  document.getElementById('ios-x').onclick = e => { e.preventDefault(); document.getElementById('ios').style.display = 'none'; };
+}
+
+// ---------- Inicio ----------
+irA(PUNTOS[0].id);
+</script>
+</body>
+</html>
