@@ -147,6 +147,7 @@ function configEscena(p, aspecto) {
     haov, vaov, vOffset: 0,
     hfov: Math.min(90, maxH), minHfov: Math.min(30, maxH), maxHfov: maxH,
     minPitch: -vaov / 2, maxPitch: vaov / 2,
+    ...(haov < 360 ? { minYaw: -haov / 2, maxYaw: haov / 2 } : {}),
     avoidShowingBackground: true,
     hotSpots: (p.caminos || []).filter(c => porId[c.a]).map(c => ({
       pitch: c.pitch ?? pitchFlecha,
