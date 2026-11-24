@@ -1,6 +1,6 @@
 // Service worker: permite instalar la app y que funcione aun sin internet
 // Cambien el número de versión cada vez que suban fotos o datos.js nuevos.
-const VERSION = 'recorrido-v5';
+const VERSION = 'recorrido-v6';
 const BASICOS = ['./', './index.html', './datos.js', './manifest.json', './iconos/icono-192.png', './iconos/icono-512.png'];
 
 self.addEventListener('install', e => {

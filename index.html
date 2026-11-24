@@ -19,7 +19,7 @@
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Segoe UI", Roboto, Arial, sans-serif; background: #111; }
-  #pano { position: absolute; inset: 0; }
+  #pano { position: absolute; inset: 0; overflow: hidden; overflow: clip; }
 
   /* Barra de búsqueda (arriba a la izquierda, como Google Maps) */
   #panel { position: absolute; top: 12px; left: 12px; width: min(360px, calc(100% - 24px)); z-index: 1000; }
@@ -155,13 +155,41 @@ function configEscena(p, aspecto) {
       cssClass: 'flecha',
       createTooltipFunc: crearFlecha,
       createTooltipArgs: porId[c.a].nombre,
-      clickHandlerFunc: (e, id) => irA(id),
+      clickHandlerFunc: (e, id) => caminar(id),
       clickHandlerArgs: c.a
     }))
   };
 }
 
-async function irA(id, profesor) {
+// Evita que el visor se desplace (franja vacía abajo) al acercarse a una flecha
+const panoDiv = document.getElementById('pano');
+panoDiv.addEventListener('scroll', () => { panoDiv.scrollTop = 0; panoDiv.scrollLeft = 0; });
+
+// Caminar hacia otro punto: la vista gira y se acerca a la flecha, luego cambia de foto
+let caminando = false;
+function caminar(id) {
+  if (caminando || !viewer) return;
+  const c = (porId[actual]?.caminos || []).find(x => x.a === id);
+  if (!c) { irA(id, null, actual); return; }
+  caminando = true;
+  const destinoHfov = Math.max(viewer.getHfovBounds ? viewer.getHfovBounds()[0] : 30, viewer.getHfov() * 0.55);
+  const desde = actual;
+  viewer.lookAt(0, c.yaw, destinoHfov, 650, () => { caminando = false; irA(id, null, desde); });
+}
+
+// Al llegar, mirar "hacia adelante": del lado contrario a la flecha que regresa
+function yawDeEntrada(p, desde, hfov, haov) {
+  const regreso = desde && (p.caminos || []).find(c => c.a === desde);
+  if (!regreso) return 0;
+  let y = regreso.yaw + 180;
+  while (y > 180) y -= 360;
+  while (y < -180) y += 360;
+  if (haov >= 360) return y;
+  const lim = Math.max(0, haov / 2 - hfov / 2);
+  return Math.max(-lim, Math.min(lim, y));
+}
+
+async function irA(id, profesor, desde) {
   const p = porId[id];
   if (!p) return;
   try {
@@ -169,7 +197,7 @@ async function irA(id, profesor) {
     const cfg = configEscena(p, aspecto);
     if (!viewer) {
       viewer = pannellum.viewer('pano', {
-        default: { firstScene: id, sceneFadeDuration: 700, autoLoad: true, compass: false, showControls: true },
+        default: { firstScene: id, sceneFadeDuration: 900, autoLoad: true, compass: false, showControls: true },
         scenes: { [id]: cfg },
         hotSpotDebug: EDITAR
       });
@@ -182,7 +210,7 @@ async function irA(id, profesor) {
       if (!viewer.getConfig().scenes || !(id in (viewer.getConfig().scenes || {}))) {
         try { viewer.addScene(id, cfg); } catch (e) {}
       }
-      viewer.loadScene(id, 0, 0, cfg.hfov);
+      viewer.loadScene(id, 0, yawDeEntrada(p, desde, cfg.hfov, cfg.haov), cfg.hfov);
     }
     actual = id;
     document.getElementById('aviso').style.display = 'none';
