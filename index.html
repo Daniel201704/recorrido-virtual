@@ -66,8 +66,28 @@
   #instalar { position: absolute; right: 12px; bottom: 12px; z-index: 1000; background: #1a73e8; color: #fff; border: 0; border-radius: 24px; padding: 12px 18px; font: 600 14px "Segoe UI", Roboto, Arial, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.45); cursor: pointer; display: none; }
   #ios { position: absolute; right: 12px; bottom: 12px; z-index: 1000; background: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; max-width: 260px; box-shadow: 0 2px 8px rgba(0,0,0,.45); display: none; }
 
+  /* Mapa plegable */
+  #toggleMapa { position: absolute; left: 12px; bottom: 200px; z-index: 1001; background: #fff; color: #202124; border: 0; border-radius: 18px; padding: 7px 12px; font: 600 13px "Segoe UI", Roboto, Arial, sans-serif; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+  body.sin-mapa #mapa, body.sin-mapa #ampliar { display: none; }
+  body.sin-mapa #toggleMapa { bottom: 12px; padding: 10px 14px; }
+  body.mapa-grande #toggleMapa { bottom: calc(min(380px, 55vh) + 20px); }
+
+  /* Ayuda y bienvenida */
+  #ayuda { position: absolute; right: 12px; top: 112px; z-index: 1000; width: 32px; height: 32px; border-radius: 50%; border: 0; background: #fff; color: #1a73e8; font: 700 17px "Segoe UI", Roboto, Arial, sans-serif; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+  #bienvenida { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 16px; }
+  #bienvenida.on { display: flex; }
+  #bienvenida .caja { background: #fff; color: #202124; border-radius: 16px; max-width: 440px; width: 100%; padding: 24px 22px 20px; box-shadow: 0 8px 30px rgba(0,0,0,.45); max-height: calc(100vh - 32px); overflow-y: auto; }
+  #bienvenida h2 { margin: 0 0 4px; font-size: 20px; }
+  #bienvenida .sub { margin: 0 0 16px; color: #5f6368; font-size: 14px; line-height: 1.4; }
+  #bienvenida ul { list-style: none; margin: 0 0 20px; padding: 0; }
+  #bienvenida li { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; font-size: 14.5px; line-height: 1.4; border-bottom: 1px solid #f1f3f4; }
+  #bienvenida li:last-child { border-bottom: 0; }
+  #bienvenida .ico { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #e8f0fe; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+  #bienvenida button { width: 100%; background: #1a73e8; color: #fff; border: 0; border-radius: 24px; padding: 12px; font: 600 15px "Segoe UI", Roboto, Arial, sans-serif; cursor: pointer; }
+
   @media (max-width: 600px) {
     #mapa { width: 150px; height: 120px; }
+    #toggleMapa { bottom: 140px; }
     #panel { width: calc(100% - 70px); }
     #tarjeta { font-size: 13px; }
   }
@@ -92,6 +112,21 @@
 
 <div id="mapa"></div>
 <button id="ampliar" title="Ampliar o reducir el mapa">⤢</button>
+<button id="toggleMapa" aria-pressed="true">Ocultar mapa</button>
+<button id="ayuda" title="Cómo usar el recorrido" aria-label="Cómo usar el recorrido">?</button>
+<div id="bienvenida" role="dialog" aria-modal="true" aria-labelledby="bv-titulo">
+  <div class="caja">
+    <h2 id="bv-titulo">Bienvenido al recorrido virtual</h2>
+    <p class="sub">Recorre el Centro Universitario UAEM Valle de México desde tu celular o computadora.</p>
+    <ul>
+      <li><span class="ico">👆</span><span><b>Mira alrededor:</b> arrastra la foto con el dedo o el mouse.</span></li>
+      <li><span class="ico">⬆️</span><span><b>Avanza:</b> toca las flechas blancas; abajo dicen a qué lugar llevan.</span></li>
+      <li><span class="ico">🗺️</span><span><b>Ubícate:</b> en el mapa, el punto rojo es donde estás. Toca otro punto para ir ahí.</span></li>
+      <li><span class="ico">🔍</span><span><b>Busca:</b> escribe un edificio o un servicio, como “control escolar” o “biblioteca”.</span></li>
+    </ul>
+    <button id="bv-ok">Comenzar recorrido</button>
+  </div>
+</div>
 <button id="instalar">📲 Instalar app</button>
 <div id="ios">📲 Para instalar: toca <b>Compartir</b> y luego <b>“Agregar a pantalla de inicio”</b>. <a href="#" id="ios-x">Cerrar</a></div>
 <div id="editor"><b>Modo edición</b><br>
@@ -272,6 +307,7 @@ function pintarMapa() {
 
 document.getElementById('ampliar').onclick = () => {
   document.getElementById('mapa').classList.toggle('grande');
+  document.body.classList.toggle('mapa-grande', document.getElementById('mapa').classList.contains('grande'));
   setTimeout(() => mapa.invalidateSize(), 250);
 };
 
@@ -339,6 +375,33 @@ if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !enApp) {
   document.getElementById('ios').style.display = 'block';
   document.getElementById('ios-x').onclick = e => { e.preventDefault(); document.getElementById('ios').style.display = 'none'; };
 }
+
+// ---------- Mapa plegable ----------
+const leer = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+function mostrarMapa(si) {
+  document.body.classList.toggle('sin-mapa', !si);
+  const b = document.getElementById('toggleMapa');
+  b.textContent = si ? 'Ocultar mapa' : '🗺️ Mapa';
+  b.setAttribute('aria-pressed', si ? 'true' : 'false');
+  if (si) setTimeout(() => { mapa.invalidateSize(); const p = porId[actual]; if (p && p.lat != null) mapa.panTo([p.lat, p.lng]); }, 50);
+}
+const prefMapa = leer('recorrido_mapa');
+mostrarMapa(prefMapa ? prefMapa === '1' : window.innerWidth > 600);
+document.getElementById('toggleMapa').onclick = () => {
+  const si = document.body.classList.contains('sin-mapa');
+  mostrarMapa(si); guardar('recorrido_mapa', si ? '1' : '0');
+};
+
+// ---------- Bienvenida ----------
+const bienvenida = document.getElementById('bienvenida');
+const abrirAyuda = () => { bienvenida.classList.add('on'); document.getElementById('bv-ok').focus(); };
+const cerrarAyuda = () => { bienvenida.classList.remove('on'); guardar('recorrido_visto', '1'); };
+document.getElementById('bv-ok').onclick = cerrarAyuda;
+document.getElementById('ayuda').onclick = abrirAyuda;
+bienvenida.addEventListener('click', e => { if (e.target === bienvenida) cerrarAyuda(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && bienvenida.classList.contains('on')) cerrarAyuda(); });
+if (!leer('recorrido_visto')) abrirAyuda();
 
 // ---------- Inicio ----------
 irA(PUNTOS[0].id);
